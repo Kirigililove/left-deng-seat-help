@@ -1,0 +1,6 @@
+import type { AppUser, Seat, ZoneConfig } from './types';
+export function seatKey(seat: Seat) { return seat.zone + '-' + seat.row + '排-' + String(seat.no).padStart(2, '0') + '号'; }
+export function rowSeatCount(configs: ZoneConfig[], zone: string, row: number) { return configs.find((item) => item.zone === zone)?.rowCounts[row - 1] ?? 0; }
+export function isSeatValid(configs: ZoneConfig[], seat: Seat) { const cfg = configs.find((item) => item.zone === seat.zone); return Boolean(cfg && seat.row >= 1 && seat.row <= cfg.rowCounts.length && seat.no >= 1 && seat.no <= rowSeatCount(configs, seat.zone, seat.row)); }
+export function isSeatTaken(users: AppUser[], seat: Seat, ignoreUserId?: string) { return users.some((user) => user.id !== ignoreUserId && user.status === 'approved' && user.seat?.zone === seat.zone && user.seat.row === seat.row && user.seat.no === seat.no); }
+export function nearbyUsers(users: AppUser[], viewer: AppUser) { if (!viewer.seat) return []; return users.filter((user) => user.id !== viewer.id && user.status === 'approved' && user.seat && user.seat.zone === viewer.seat?.zone && Math.abs(user.seat.row - viewer.seat.row) <= 5 && Math.abs(user.seat.no - viewer.seat.no) <= 10); }
