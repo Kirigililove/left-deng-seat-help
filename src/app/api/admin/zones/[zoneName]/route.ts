@@ -11,7 +11,9 @@ function parseRows(value: unknown) {
   return rows;
 }
 
-export async function PUT(request: Request, context: { params: { zoneName: string } }) {
+type RouteContext = { params: { zoneName: string } };
+
+export async function PUT(request: Request, context: RouteContext) {
   try {
     await requireAdmin();
     const body = await request.json().catch(() => null) as { tier?: string; zone?: string; rowCounts?: number[] } | null;
@@ -30,7 +32,7 @@ export async function PUT(request: Request, context: { params: { zoneName: strin
   }
 }
 
-export async function DELETE(_request: Request, context: { params: { zoneName: string } }) {
+export async function DELETE(_request: Request, context: RouteContext) {
   try {
     await requireAdmin();
     const eventId = await getActiveEventId();

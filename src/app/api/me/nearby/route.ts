@@ -4,6 +4,9 @@ import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { getActiveEventId } from '@/lib/supabase/events';
 import { routeError } from '@/lib/api/errors';
 
+type OwnSeatRow = { zone_id: string; row_no: number; seat_no: number; venue_zones?: { zone_name: string; tier_name: string; row_counts: number[] } | { zone_name: string; tier_name: string; row_counts: number[] }[] | null };
+
+
 export async function GET() {
   try {
     const user = await requireUser();
@@ -20,17 +23,18 @@ export async function GET() {
 
     if (ownSeat.error) return NextResponse.json({ error: ownSeat.error.message }, { status: 500 });
     if (!ownSeat.data) return NextResponse.json({ seat: null, nearby: [], message: '请先登记自己的座位' });
+    const ownSeatData = ownSeat.data as OwnSeatRow;
 
-    const minRow = Math.max(1, ownSeat.data.row_no - 5);
-    const maxRow = ownSeat.data.row_no + 5;
-    const minNo = Math.max(1, ownSeat.data.seat_no - 10);
-    const maxNo = ownSeat.data.seat_no + 10;
+    const minRow = Math.max(1, ownSeatData.row_no - 5);
+    const maxRow = ownSeatData.row_no + 5;
+    const minNo = Math.max(1, ownSeatData.seat_no - 10);
+    const maxNo = ownSeatData.seat_no + 10;
 
     const nearby = await supabase
       .from('seats')
       .select('row_no, seat_no, message, app_users(id, weibo_name, wechat_name, offline_group, fan_note)')
       .eq('event_id', eventId)
-      .eq('zone_id', ownSeat.data.zone_id)
+      .eq('zone_id', ownSeatData.zone_id)
       .gte('row_no', minRow)
       .lte('row_no', maxRow)
       .gte('seat_no', minNo)

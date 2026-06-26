@@ -3,7 +3,9 @@ import { requireAdmin } from '@/lib/auth/guards';
 import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { routeError } from '@/lib/api/errors';
 
-export async function DELETE(_request: Request, context: { params: { fieldId: string } }) {
+type RouteContext = { params: { fieldId: string } };
+
+export async function DELETE(_request: Request, context: RouteContext) {
   try {
     await requireAdmin();
     const supabase = createAdminSupabaseClient();

@@ -4,7 +4,9 @@ import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { getActiveEventId, getZoneByName, validateSeat } from '@/lib/supabase/events';
 import { routeError } from '@/lib/api/errors';
 
-export async function PUT(request: Request, context: { params: { userId: string } }) {
+type RouteContext = { params: { userId: string } };
+
+export async function PUT(request: Request, context: RouteContext) {
   try {
     const admin = await requireAdmin();
     const body = await request.json().catch(() => null) as { zone?: string; row?: number; no?: number; message?: string } | null;

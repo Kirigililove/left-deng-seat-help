@@ -4,6 +4,9 @@ import { createSessionToken } from '@/lib/auth/session';
 import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { getActiveEventId } from '@/lib/supabase/events';
 
+type SeatWithZone = { row_no: number; seat_no: number; venue_zones?: { tier_name: string; zone_name: string } | { tier_name: string; zone_name: string }[] | null };
+
+
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as { account?: string; password?: string } | null;
   const account = body?.account?.trim();
@@ -32,8 +35,9 @@ export async function POST(request: Request) {
     .eq('event_id', eventId)
     .eq('user_id', rawUser.id)
     .maybeSingle();
-  const zone = Array.isArray(seatResult.data?.venue_zones) ? seatResult.data?.venue_zones[0] : seatResult.data?.venue_zones;
-  const seat = seatResult.data && zone ? { tier: zone.tier_name, zone: zone.zone_name, row: seatResult.data.row_no, no: seatResult.data.seat_no } : null;
+  const seatData = seatResult.data as SeatWithZone | null;
+  const zone = Array.isArray(seatData?.venue_zones) ? seatData?.venue_zones[0] : seatData?.venue_zones;
+  const seat = seatData && zone ? { tier: zone.tier_name, zone: zone.zone_name, row: seatData.row_no, no: seatData.seat_no } : null;
   const user = { ...rawUser, role, seat };
   const response = NextResponse.json({ user });
   response.cookies.set('ld_session', createSessionToken({ userId: user.id, role }), {

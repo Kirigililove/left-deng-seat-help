@@ -4,6 +4,9 @@ import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { getActiveEventId } from '@/lib/supabase/events';
 import { routeError } from '@/lib/api/errors';
 
+type SeatStatsRow = { venue_zones?: { zone_name?: string | null } | { zone_name?: string | null }[] | null };
+
+
 export async function GET() {
   try {
     await requireAdmin();
@@ -20,7 +23,8 @@ export async function GET() {
     if (seats.error) return NextResponse.json({ error: seats.error.message }, { status: 500 });
 
     const byZone: Record<string, number> = {};
-    for (const seat of seats.data ?? []) {
+    for (const rawSeat of seats.data ?? []) {
+      const seat = rawSeat as SeatStatsRow;
       const zone = Array.isArray(seat.venue_zones) ? seat.venue_zones[0]?.zone_name : seat.venue_zones?.zone_name;
       if (zone) byZone[zone] = (byZone[zone] ?? 0) + 1;
     }

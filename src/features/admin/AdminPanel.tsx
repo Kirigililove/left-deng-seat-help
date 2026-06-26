@@ -185,5 +185,27 @@ function ProofAdmin({ proofFields, setProofFields }: { proofFields: ProofField[]
       alert(error instanceof Error ? error.message : '新增失败');
     }
   }
-  return <div className="table"><form className="form" onSubmit={(event) => { event.preventDefault(); addField(new FormData(event.currentTarget)); event.currentTarget.reset(); }}><input name="label" placeholder="新增项名称" /><select name="type"><option value="image">图片上传</option><option value="text">填空</option><option value="radio">单选</option><option value="checkbox">多选</option></select><input name="options" placeholder="选项：是,否" /><button className="btn">新增</button></form>{proofFields.map((field) => <div className="row" key={field.id}><strong>{field.label}</strong><small>{proofFieldTypeLabel(field.type)}</small><button className="btn danger" onClick={async () => { try { await deleteProofFieldFromApi(field.id); setProofFields((prev) => prev.filter((item) => item.id !== field.id)); } catch (error) { alert(error instanceof Error ? error.message : '删除失败'); } }}>删除</button></div>)}</div>;
+
+  return (
+    <div className="table">
+      <form className="form" onSubmit={(event) => { event.preventDefault(); addField(new FormData(event.currentTarget)); event.currentTarget.reset(); }}>
+        <input name="label" placeholder="新增项名称" />
+        <select name="type">
+          <option value="image">图片上传</option>
+          <option value="text">填空</option>
+          <option value="radio">单选</option>
+          <option value="checkbox">多选</option>
+        </select>
+        <input name="options" placeholder="选项：是,否" />
+        <button className="btn">新增</button>
+      </form>
+      {proofFields.map((field) => (
+        <div className="row" key={field.id}>
+          <strong>{field.label}</strong>
+          <small>{proofFieldTypeLabel(field.type)}</small>
+          <button className="btn danger" onClick={async () => { try { await deleteProofFieldFromApi(field.id); setProofFields((prev) => prev.filter((item) => item.id !== field.id)); } catch (error) { alert(error instanceof Error ? error.message : '删除失败'); } }}>删除</button>
+        </div>
+      ))}
+    </div>
+  );
 }

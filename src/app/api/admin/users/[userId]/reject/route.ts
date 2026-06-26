@@ -3,7 +3,9 @@ import { requireAdmin } from '@/lib/auth/guards';
 import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { routeError } from '@/lib/api/errors';
 
-export async function POST(request: Request, context: { params: { userId: string } }) {
+type RouteContext = { params: { userId: string } };
+
+export async function POST(request: Request, context: RouteContext) {
   try {
     const admin = await requireAdmin();
     const body = await request.json().catch(() => null) as { reason?: string } | null;

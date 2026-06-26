@@ -4,7 +4,9 @@ import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { getActiveEventId, getZoneByName } from '@/lib/supabase/events';
 import { routeError } from '@/lib/api/errors';
 
-export async function GET(_request: Request, context: { params: { zoneName: string } }) {
+type RouteContext = { params: { zoneName: string } };
+
+export async function GET(_request: Request, context: RouteContext) {
   try {
     await requireAdmin();
     const eventId = await getActiveEventId();
