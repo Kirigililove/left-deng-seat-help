@@ -95,7 +95,9 @@ async function uploadImage(file,prefixName){
 }
 async function submitProof(ev){
   ev.preventDefault();
-  if(!await appConfirm('请确认自证信息已经检查无误。提交后审核结果出来前不能修改。', '确认提交自证'))return;
+  const submitBtn=ev.submitter||ev.target.querySelector('button');
+  const oldText=submitBtn?submitBtn.textContent:'';
+  if(submitBtn){submitBtn.disabled=true;submitBtn.textContent='提交中...'}
   const fd=new FormData(ev.target);
   const answers=[];
   try{
@@ -134,9 +136,11 @@ async function submitProof(ev){
       user=await rpc('zd_request_seat',{p_token:state.token,p_zone:parsedSeat.zone,p_row:parsedSeat.row,p_no:parsedSeat.no,p_screenshot_url:seatUrl,p_message:''});
       state.user=user;
     }
-    await appAlert(parsedSeat?'身份自证和座位截图都已提交，等待管理员审核':'身份自证已提交。座位还没出的话，通过身份审核后也不会显示座位图。','已提交');
     render();
-  }catch(e){await appAlert(e.message,'出错了')}
+  }catch(e){
+    if(submitBtn){submitBtn.disabled=false;submitBtn.textContent=oldText}
+    await appAlert(e.message,'出错了')
+  }
 }
 function zoneOptions(){return state.zones.map(z=>'<option value="'+esc(z.zone)+'">'+esc(z.zone)+'</option>').join('')}
 function seatRequestLabel(s){return {pending:'座位待审核',approved:'座位已通过',rejected:'座位已打回'}[s]||s}
@@ -202,8 +206,10 @@ function rowInputToNumber(value){
 function seatText(s){return s.zone+'-'+rowLabel(s.row)+'行-'+s.no+'号'}
 function statusLabel(s){return {approved:'已审核',pending:'待审核',rejected:'已打回',needs_proof:'待提交自证',deactivated:'已注销'}[s]||s}
 async function saveSeat(){
+  const btn=document.getElementById('saveSeat');
+  const oldText=btn?btn.textContent:'';
   try{
-    if(!await appConfirm('请确认座位信息和截图无误。提交后会进入审核，审核前不能继续反复提交。', '确认提交座位'))return;
+    if(btn){btn.disabled=true;btn.textContent='提交中...'}
     const rowRaw=String(document.getElementById('seatRow').value||'').trim();
     const noRaw=String(document.getElementById('seatNo').value||'').trim();
     if(!rowRaw||!noRaw)throw new Error('请填写行和号');
@@ -214,9 +220,11 @@ async function saveSeat(){
     const user=await rpc('zd_request_seat',{p_token:state.token,p_zone:document.getElementById('seatZone').value,p_row:rowInputToNumber(rowRaw),p_no:+noRaw,p_screenshot_url:screenshotUrl,p_message:noteEl?noteEl.value:state.user.fanNote});
     state.user=user;
     state.seatEditMode=false;
-    await appAlert('座位申请已提交，等待管理员审核','已提交');
     render();
-  }catch(e){await appAlert(e.message,'出错了')}
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent=oldText}
+    await appAlert(e.message,'出错了')
+  }
 }
 async function withdrawSeatRequest(){
   if(!await appConfirm('确定撤回这次座位变更吗？撤回后管理员后台对应的座位审核会消失。', '撤回座位变更', true))return;
