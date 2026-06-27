@@ -94,7 +94,16 @@ function renderProof(){
   document.getElementById('proofForm').onsubmit=submitProof;
 }
 function isProfileField(f){return ['微博名','微信名','是否在线下群'].includes(f.label)}
-function proofInput(f){ if(isProfileField(f)) return ''; if(f.type==='image') return '<label class="field full">'+esc(f.label)+'<input name="'+f.id+'" type="file" accept="image/*" required></label>'; if(f.type==='text') return '<label class="field full">'+esc(f.label)+'<input name="'+f.id+'" required></label>'; if(f.type==='radio') return '<label class="field full">'+esc(f.label)+'<select name="'+f.id+'" required><option value="">请选择</option>'+(f.options||[]).map(o=>'<option>'+esc(o)+'</option>').join('')+'</select></label>'; return '<div class="field full"><span>'+esc(f.label)+'</span>'+(f.options||[]).map(o=>'<label><input type="checkbox" name="'+f.id+'" value="'+esc(o)+'"> '+esc(o)+'</label>').join('')+'</div>'; }
+function proofInput(f){
+  if(isProfileField(f)) return '';
+  const required=f.required!==false;
+  const req=required?' required':'';
+  const tag=required?'':' <small class="muted">（可选）</small>';
+  if(f.type==='image') return '<label class="field full">'+esc(f.label)+tag+'<input name="'+f.id+'" type="file" accept="image/*"'+req+'></label>';
+  if(f.type==='text') return '<label class="field full">'+esc(f.label)+tag+'<input name="'+f.id+'"'+req+'></label>';
+  if(f.type==='radio') return '<label class="field full">'+esc(f.label)+tag+'<select name="'+f.id+'"'+req+'><option value="">请选择</option>'+(f.options||[]).map(o=>'<option>'+esc(o)+'</option>').join('')+'</select></label>';
+  return '<div class="field full"><span>'+esc(f.label)+(required?'':'（可选）')+'</span>'+(f.options||[]).map(o=>'<label><input type="checkbox" name="'+f.id+'" value="'+esc(o)+'"> '+esc(o)+'</label>').join('')+'</div>';
+}
 async function uploadImage(file,prefixName){
   if(!file||!file.name)throw new Error('请先选择截图');
   const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
@@ -114,18 +123,19 @@ async function submitProof(ev){
     showLoading('自证和截图正在上传，请等待，不要关闭页面。','正在上传');
     for(const f of state.fields){
       if(isProfileField(f)) continue;
+      const required=f.required!==false;
       if(f.type==='image'){
         const file=fd.get(f.id);
-        if(!file||!file.name) throw new Error('自证项还没填完：'+f.label);
+        if(!file||!file.name){ if(required) throw new Error('自证项还没填完：'+f.label); else continue; }
         const pub=await uploadImage(file,f.id);
         answers.push({fieldId:f.id,fileUrl:pub});
       } else if(f.type==='checkbox'){
         const vals=fd.getAll(f.id);
-        if(!vals.length) throw new Error('自证项还没填完：'+f.label);
+        if(!vals.length){ if(required) throw new Error('自证项还没填完：'+f.label); else continue; }
         answers.push({fieldId:f.id,valueJson:vals});
       } else {
         const v=String(fd.get(f.id)||'').trim();
-        if(!v) throw new Error('自证项还没填完：'+f.label);
+        if(!v){ if(required) throw new Error('自证项还没填完：'+f.label); else continue; }
         answers.push({fieldId:f.id,valueText:v});
       }
     }
@@ -438,12 +448,30 @@ window.saveZone=async(btn)=>{
   }catch(e){await appAlert(e.message,'出错了')}
 };
 window.deleteZone=async(z)=>{ if(!await appConfirm('确定删除 '+z+' 吗？已经有人登记的区不能删除。','删除区域',true))return; try{await rpc('zd_admin_delete_zone',{p_token:state.token,p_zone:z}); state.zones=await rpc('zd_zones'); renderAdmin();}catch(e){await appAlert(e.message,'出错了')}};
+function proofTypeOptions(value){return ['image:图片上传','text:填空','radio:单选','checkbox:多选'].map(x=>{let [v,l]=x.split(':');return '<option value="'+v+'" '+(value===v?'selected':'')+'>'+l+'</option>'}).join('')}
+function requiredOptions(value){return '<option value="true" '+(value!==false?'selected':'')+'>必填</option><option value="false" '+(value===false?'selected':'')+'>非必填</option>'}
 function renderProofConfig(){
-  document.getElementById('adminBody').innerHTML='<div class="row"><input id="pfLabel" placeholder="新增项名称"><select id="pfType"><option value="image">图片上传</option><option value="text">填空</option><option value="radio">单选</option><option value="checkbox">多选</option></select><input id="pfOptions" placeholder="选项 是,否"><button class="btn" id="addFieldBtn">新增</button></div>'+state.fields.filter(f=>!isProfileField(f)).map(f=>'<div class="row"><b>'+esc(f.label)+'</b><small>'+esc(f.type)+'</small><button class="btn danger" data-field-id="'+esc(f.id)+'">删除</button></div>').join('');
-  document.getElementById('addFieldBtn').onclick=addField;
-  document.querySelectorAll('[data-field-id]').forEach(btn=>btn.onclick=()=>deleteField(btn.dataset.fieldId));
+  const fields=state.fields.filter(f=>!isProfileField(f));
+  const add='<div class="config-add status" data-proof-card="new"><label class="field"><span>新增项名称</span><input class="pf-label" placeholder="如 微博主页自证"></label><label class="field"><span>类型</span><select class="pf-type">'+proofTypeOptions('image')+'</select></label><label class="field"><span>必填状态</span><select class="pf-required">'+requiredOptions(true)+'</select></label><label class="field"><span>选项</span><input class="pf-options" placeholder="单选/多选用：是,否"></label><button class="btn" data-proof-act="add">新增</button></div>';
+  const list=fields.length?fields.map(f=>'<div class="config-card" data-proof-card="old" data-field-id="'+esc(f.id)+'"><label class="field"><span>名称</span><input class="pf-label" value="'+esc(f.label)+'"></label><label class="field"><span>类型</span><select class="pf-type">'+proofTypeOptions(f.type)+'</select></label><label class="field"><span>必填状态</span><select class="pf-required">'+requiredOptions(f.required!==false)+'</select></label><label class="field"><span>选项</span><input class="pf-options" value="'+esc((f.options||[]).join(','))+'" placeholder="单选/多选用：是,否"></label><button class="btn secondary" data-proof-act="save">保存</button><button class="btn danger" data-proof-act="delete">删除</button></div>').join(''):'<div class="status">暂无自证项</div>';
+  document.getElementById('adminBody').innerHTML='<div class="config-wrap">'+add+list+'</div>';
+  document.querySelectorAll('[data-proof-act]').forEach(btn=>btn.onclick=()=>{
+    const card=btn.closest('[data-proof-card]');
+    if(btn.dataset.proofAct==='add') addField(card);
+    if(btn.dataset.proofAct==='save') saveField(card);
+    if(btn.dataset.proofAct==='delete') deleteField(card.dataset.fieldId);
+  });
 }
-window.addField=async()=>{ try{ await rpc('zd_admin_add_proof_field',{p_token:state.token,p_label:document.getElementById('pfLabel').value,p_type:document.getElementById('pfType').value,p_options:document.getElementById('pfOptions').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean)}); state.fields=await rpc('zd_proof_fields'); renderAdmin(); }catch(e){await appAlert(e.message,'出错了')} };
+function proofCardPayload(card){
+  return {
+    label:card.querySelector('.pf-label').value.trim(),
+    type:card.querySelector('.pf-type').value,
+    required:card.querySelector('.pf-required').value==='true',
+    options:card.querySelector('.pf-options').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean)
+  };
+}
+window.addField=async(card)=>{ try{ const p=proofCardPayload(card); await rpc('zd_admin_add_proof_field',{p_token:state.token,p_label:p.label,p_type:p.type,p_options:p.options,p_required:p.required}); state.fields=await rpc('zd_proof_fields'); renderAdmin(); }catch(e){await appAlert(e.message,'出错了')} };
+window.saveField=async(card)=>{ try{ const p=proofCardPayload(card); await rpc('zd_admin_update_proof_field',{p_token:state.token,p_field_id:card.dataset.fieldId,p_label:p.label,p_type:p.type,p_options:p.options,p_required:p.required}); state.fields=await rpc('zd_proof_fields'); renderAdmin(); }catch(e){await appAlert(e.message,'出错了')} };
 window.deleteField=async(id)=>{ try{ await rpc('zd_admin_delete_proof_field',{p_token:state.token,p_field_id:id}); state.fields=await rpc('zd_proof_fields'); renderAdmin(); }catch(e){await appAlert(e.message,'出错了')} };
 boot();
 </script>
