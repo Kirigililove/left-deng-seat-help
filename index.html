@@ -11,13 +11,16 @@
 </head>
 <body>
 <div class="app">
-  <aside class="side"><div class="brand"><div class="logo">CP</div><div><h1>同担座位互助</h1><p class="muted">静态版 · 数据存在 Supabase</p></div></div><p class="muted">未审核不显示座位图；用户只看附近同担；管理员看全局。</p></aside>
-  <main><header class="top"><div><h2>左邓粉丝 · 银河综艺馆 · 同担座位互助</h2><p class="muted">由左邓粉丝研发，仅限左邓粉丝使用。</p></div><button id="logoutBtn" class="btn secondary hide">退出</button></header><div id="app" class="wrap"></div></main>
+  <aside class="side"><div class="brand"><div class="logo">CP</div><div><h1>同担座位互助</h1><p class="muted">静态版 v3 · 数据存在 Supabase</p></div></div><p class="muted">未审核不显示座位图；用户只看附近同担；管理员看全局。</p></aside>
+  <main><header class="top"><div><h2>左邓粉丝 · 银河综艺馆 · 同担座位互助</h2><p class="muted">由左邓粉丝研发，仅限左邓粉丝使用。</p></div><button id="logoutBtn" class="btn secondary hide">退出</button></header><div id="app" class="wrap"><section class="panel"><div class="head"><h3>正在加载登录入口</h3></div><div class="body"><div class="status">如果这里一直不变，请截图发给我。</div></div></section></div></main>
 </div>
 <script>
+window.addEventListener('error', function(event){ var el=document.getElementById('app'); if(el) el.innerHTML='<section class="panel"><div class="head"><h3>页面脚本报错</h3></div><div class="body"><div class="status">'+String(event.message||'未知错误')+'</div></div></section>'; });
+window.addEventListener('unhandledrejection', function(event){ var el=document.getElementById('app'); var msg=event.reason&&event.reason.message?event.reason.message:event.reason; if(el) el.innerHTML='<section class="panel"><div class="head"><h3>加载失败</h3></div><div class="body"><div class="status">'+String(msg||'未知错误')+'</div></div></section>'; });
 const SUPABASE_URL = 'https://whusghlbepizbkhhddlb.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndodXNnaGxiZXBpemJraGhkZGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTQ4MDksImV4cCI6MjA5ODA3MDgwOX0.X-GfbDkrTSHUd3lbiYcQru3av5YWXdm7dzTPgbflQCA';
-const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+if (!window.supabase) { throw new Error('Supabase 脚本没有加载成功，请刷新或检查网络'); }
+const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const state = { token: localStorage.getItem('zd_token') || '', user: null, fields: [], zones: [], users: [], submissions: [], tab: 'login', adminTab: 'audit', selectedZone: '101区' };
 const app = document.getElementById('app');
 const logoutBtn = document.getElementById('logoutBtn');
