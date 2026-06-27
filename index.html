@@ -22,7 +22,7 @@ const SUPABASE_URL = 'https://whusghlbepizbkhhddlb.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndodXNnaGxiZXBpemJraGhkZGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTQ4MDksImV4cCI6MjA5ODA3MDgwOX0.X-GfbDkrTSHUd3lbiYcQru3av5YWXdm7dzTPgbflQCA';
 if (!window.supabase) { throw new Error('Supabase 脚本没有加载成功，请刷新或检查网络'); }
 const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const state = { token: localStorage.getItem('zd_token') || '', user: null, fields: [], zones: [], users: [], submissions: [], tab: 'login', adminTab: 'audit', selectedZone: '101区' };
+const state = { token: localStorage.getItem('zd_token') || '', user: null, fields: [], zones: [], users: [], submissions: [], tab: 'login', adminTab: 'audit', selectedZone: '101区', seatEditMode: false };
 const app = document.getElementById('app');
 const logoutBtn = document.getElementById('logoutBtn');
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -42,26 +42,18 @@ async function authGo(){ const account=document.getElementById('account').value.
 function renderProof(){
   const fields=state.fields.map(f=>proofInput(f)).join('');
   const req=state.user.seatRequest||{};
-  const seatValue=req.status==='rejected'?req.seatText:'';
-  html('<section class="panel"><div class="head"><h3>上传自证</h3></div><div class="body"><form id="proofForm" class="form">'+(state.user.rejectReason?'<div class="status full"><b>打回原因</b><p>'+esc(state.user.rejectReason)+'</p></div>':'')+'<label class="field">微博名<input name="weiboName" value="'+esc(state.user.weiboName)+'" required></label><label class="field">微信名<input name="wechatName" value="'+esc(state.user.wechatName)+'" required></label><label class="field full">是否在线下群<select name="offlineGroup" required><option value="">请选择</option><option '+(state.user.offlineGroup==='是'?'selected':'')+'>是</option><option '+(state.user.offlineGroup==='否'?'selected':'')+'>否</option></select></label>'+fields+'<label class="field full">座位号<input name="initialSeatText" value="'+esc(seatValue)+'" placeholder="如 101区-A排-12号；还没出座填 暂无" required></label><label class="field full">座位号码截图<input name="initialSeatImage" type="file" accept="image/*"><small class="muted">如果座位还没出，座位号填“暂无”，这里可以先不传。</small></label><button class="btn full">提交审核</button></form></div></section>');
+  const canPrefill=req.status==='rejected'&&req.zone;
+  html('<section class="panel"><div class="head"><h3>上传自证</h3></div><div class="body"><form id="proofForm" class="form">'+(state.user.rejectReason?'<div class="status full"><b>打回原因</b><p>'+esc(state.user.rejectReason)+'</p></div>':'')+'<div class="status full"><b>提交前请检查清楚</b><p class="muted">自证提交后，审核结果出来前不能修改；如果座位还没出，可以勾选“暂无”。</p></div><label class="field">微博名<input name="weiboName" value="'+esc(state.user.weiboName)+'" required></label><label class="field">微信名<input name="wechatName" value="'+esc(state.user.wechatName)+'" required></label><label class="field full">是否在线下群<select name="offlineGroup" required><option value="">请选择</option><option '+(state.user.offlineGroup==='是'?'selected':'')+'>是</option><option '+(state.user.offlineGroup==='否'?'selected':'')+'>否</option></select></label>'+fields+'<div class="field full"><label><input type="checkbox" name="initialSeatUnknown" id="initialSeatUnknown"> 座位还没出 / 暂无</label></div><div id="initialSeatFields" class="form full"><label class="field">区<select name="initialSeatZone" id="initialSeatZone">'+zoneOptions()+'</select></label><label class="field">行<input name="initialSeatRow" value="'+(canPrefill?esc(rowLabel(req.row)):'')+'" placeholder="A 或 1"></label><label class="field">号<input name="initialSeatNo" type="number" value="'+(canPrefill?esc(req.no):'')+'" placeholder="如 9"></label><label class="field full">座位号码截图<input name="initialSeatImage" type="file" accept="image/*"><small class="muted">填了具体座位就必须上传座位截图。</small></label></div><button class="btn full">提交审核</button></form></div></section>');
+  if(canPrefill)document.getElementById('initialSeatZone').value=req.zone;
+  const unknown=document.getElementById('initialSeatUnknown');
+  const fieldsBox=document.getElementById('initialSeatFields');
+  const toggle=()=>fieldsBox.classList.toggle('hide',unknown.checked);
+  unknown.onchange=toggle;
+  toggle();
   document.getElementById('proofForm').onsubmit=submitProof;
 }
 function isProfileField(f){return ['微博名','微信名','是否在线下群'].includes(f.label)}
 function proofInput(f){ if(isProfileField(f)) return ''; if(f.type==='image') return '<label class="field full">'+esc(f.label)+'<input name="'+f.id+'" type="file" accept="image/*" required></label>'; if(f.type==='text') return '<label class="field full">'+esc(f.label)+'<input name="'+f.id+'" required></label>'; if(f.type==='radio') return '<label class="field full">'+esc(f.label)+'<select name="'+f.id+'" required><option value="">请选择</option>'+(f.options||[]).map(o=>'<option>'+esc(o)+'</option>').join('')+'</select></label>'; return '<div class="field full"><span>'+esc(f.label)+'</span>'+(f.options||[]).map(o=>'<label><input type="checkbox" name="'+f.id+'" value="'+esc(o)+'"> '+esc(o)+'</label>').join('')+'</div>'; }
-function isNoSeatText(v){const s=String(v||'').trim().replace(/\s/g,'');return ['暂无','无','没有','还没出','未出','未知'].includes(s)}
-function parseSeatInput(value){
-  const raw=String(value||'').trim();
-  if(!raw||isNoSeatText(raw))return null;
-  const tokens=raw.toUpperCase().replace(/区|排|行|座位|座号|座號|号|號/g,' ').replace(/[^0-9A-Z]+/g,' ').trim().split(/\s+/).filter(Boolean);
-  const zi=tokens.findIndex(t=>/^\d{3}$/.test(t));
-  if(zi<0)throw new Error('座位号格式看不懂，请按 101区-A排-12号 这样填写');
-  const rest=tokens.slice(zi+1);
-  const ri=rest.findIndex(t=>/^[A-Z]+$/.test(t)||/^\d+$/.test(t));
-  if(ri<0)throw new Error('座位号里没有识别到排/行');
-  const ni=rest.slice(ri+1).findIndex(t=>/^\d+$/.test(t));
-  if(ni<0)throw new Error('座位号里没有识别到号数');
-  return {zone:tokens[zi]+'区', row:rowInputToNumber(rest[ri]), no:Number(rest[ri+1+ni])};
-}
 async function uploadImage(file,prefixName){
   if(!file||!file.name)throw new Error('请先选择截图');
   const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
@@ -72,6 +64,7 @@ async function uploadImage(file,prefixName){
 }
 async function submitProof(ev){
   ev.preventDefault();
+  if(!confirm('请确认自证信息已经检查无误。提交后审核结果出来前不能修改，确定提交吗？'))return;
   const fd=new FormData(ev.target);
   const answers=[];
   try{
@@ -92,10 +85,17 @@ async function submitProof(ev){
         answers.push({fieldId:f.id,valueText:v});
       }
     }
-    const seatText=String(fd.get('initialSeatText')||'').trim();
-    const parsedSeat=parseSeatInput(seatText);
+    const noSeat=fd.get('initialSeatUnknown')==='on';
+    const zone=String(fd.get('initialSeatZone')||'').trim();
+    const rowRaw=String(fd.get('initialSeatRow')||'').trim();
+    const noRaw=String(fd.get('initialSeatNo')||'').trim();
     const seatFile=fd.get('initialSeatImage');
-    if(parsedSeat&&(!seatFile||!seatFile.name)) throw new Error('填了具体座位号的话，需要上传座位号码截图');
+    let parsedSeat=null;
+    if(!noSeat){
+      if(!zone||!rowRaw||!noRaw)throw new Error('请填写座位区、行、号；如果座位还没出，请勾选“暂无”');
+      if(!seatFile||!seatFile.name)throw new Error('填了具体座位号的话，需要上传座位号码截图');
+      parsedSeat={zone,row:rowInputToNumber(rowRaw),no:Number(noRaw)};
+    }
     let user=await rpc('zd_submit_proof',{p_token:state.token,p_weibo:fd.get('weiboName'),p_wechat:fd.get('wechatName'),p_offline:fd.get('offlineGroup')==='是',p_answers:answers});
     state.user=user;
     if(parsedSeat){
@@ -109,32 +109,45 @@ async function submitProof(ev){
 }
 function zoneOptions(){return state.zones.map(z=>'<option value="'+esc(z.zone)+'">'+esc(z.zone)+'</option>').join('')}
 function seatRequestLabel(s){return {pending:'座位待审核',approved:'座位已通过',rejected:'座位已打回'}[s]||s}
+function seatDisplayText(s){ if(!s)return ''; if(s.zone&&s.row&&s.no)return s.zone+'-'+rowLabel(s.row)+'行-'+s.no+'号'; return s.seatText||''; }
 function seatRequestNotice(){
   const r=state.user.seatRequest;
   if(!r)return '';
-  if(r.status==='pending')return '<div class="status full"><b>座位审核中</b><p class="muted">已提交：'+esc(r.seatText)+'。通过前不会显示新的座位示意图。</p></div>';
-  if(r.status==='rejected')return '<div class="status danger full"><b>座位审核已打回</b><p>'+esc(r.rejectReason||'请重新提交座位号和截图')+'</p><p class="muted">上次提交：'+esc(r.seatText)+'</p></div>';
+  if(r.status==='pending')return '<div class="status full"><b>座位审核中</b><p class="muted">已提交：'+esc(seatDisplayText(r))+'。审核前不会生效，也不会改变你能看到的座位范围。</p><div class="mini"><button class="btn secondary" id="withdrawSeat">撤回变更</button><button class="btn" id="editPendingSeat">重新变更</button></div></div>';
+  if(r.status==='rejected')return '<div class="status danger full"><b>座位审核已打回</b><p>'+esc(r.rejectReason||'请重新提交座位号和截图')+'</p><p class="muted">上次提交：'+esc(seatDisplayText(r))+'</p></div>';
   return '';
 }
 function profileEditBox(){return '<div class="status"><b>修改公开资料</b><div class="form"><label class="field"><span>微博名</span><input id="profileWeibo" value="'+esc(state.user.weiboName)+'"></label><label class="field"><span>微信名</span><input id="profileWechat" value="'+esc(state.user.wechatName)+'"></label><label class="field full"><span>是否在线下群</span><select id="profileOffline"><option '+(state.user.offlineGroup==='是'?'selected':'')+'>是</option><option '+(state.user.offlineGroup==='否'?'selected':'')+'>否</option></select></label><button id="saveProfile" class="btn secondary full">保存公开资料</button></div></div>'}
 function seatFormHtml(title,buttonText){
-  const s=state.user.seat;
-  return '<div class="tabs"><button class="active">'+esc(title)+'</button></div><div class="form"><label class="field">区<select id="seatZone">'+zoneOptions()+'</select></label><label class="field">行<input id="seatRow" type="text" value="'+(s?rowLabel(s.row):'A')+'" placeholder="A 或 1"></label><label class="field">号<input id="seatNo" type="number" value="'+(s?.no||1)+'"></label><label class="field full">座位号码截图<input id="seatShot" type="file" accept="image/*"></label><button id="saveSeat" class="btn full">'+esc(buttonText)+'</button><p class="muted full">提交后需要管理员审核，通过前不会改变你能看到的座位范围。</p></div>';
+  const req=state.user.seatRequest;
+  const base=(state.seatEditMode&&req&&req.status==='pending')||req?.status==='rejected'?req:state.user.seat;
+  const zone=base?.zone||state.user.seat?.zone||'';
+  return '<div class="tabs"><button class="active">'+esc(title)+'</button></div><div class="form"><label class="field">区<select id="seatZone">'+zoneOptions()+'</select></label><label class="field">行<input id="seatRow" type="text" value="'+(base?.row?rowLabel(base.row):'')+'" placeholder="A 或 1"></label><label class="field">号<input id="seatNo" type="number" value="'+(base?.no||'')+'" placeholder="如 9"></label><label class="field full">座位号码截图<input id="seatShot" type="file" accept="image/*"></label><button id="saveSeat" class="btn full">'+esc(buttonText)+'</button><p class="muted full">提交后需要管理员审核。待审核期间会锁住，除非撤回或选择重新变更。</p></div>';
 }
+function shouldShowSeatForm(){ const r=state.user.seatRequest; return !r||r.status!=='pending'||state.seatEditMode; }
 function bindProfileAndSeat(){
   const saveSeatBtn=document.getElementById('saveSeat');
   const saveProfileBtn=document.getElementById('saveProfile');
-  if(state.user.seat) document.getElementById('seatZone').value=state.user.seat.zone;
+  const withdrawBtn=document.getElementById('withdrawSeat');
+  const editBtn=document.getElementById('editPendingSeat');
+  const zoneEl=document.getElementById('seatZone');
+  const req=state.user.seatRequest;
+  const base=(state.seatEditMode&&req&&req.status==='pending')||req?.status==='rejected'?req:state.user.seat;
+  if(zoneEl&&(base?.zone||state.user.seat?.zone)) zoneEl.value=base?.zone||state.user.seat.zone;
   if(saveSeatBtn)saveSeatBtn.onclick=saveSeat;
   if(saveProfileBtn)saveProfileBtn.onclick=saveProfile;
+  if(withdrawBtn)withdrawBtn.onclick=withdrawSeatRequest;
+  if(editBtn)editBtn.onclick=()=>{state.seatEditMode=true;render()};
 }
 function renderSeatGate(){
-  html('<section class="panel"><div class="head"><h3>座位审核</h3></div><div class="body"><div class="status full"><b>身份审核已通过</b><p class="muted">但你的座位还没有通过审核，所以暂时不显示座位示意图、附近同担和人数。</p></div>'+seatRequestNotice()+profileEditBox()+seatFormHtml('提交座位审核','提交座位审核')+'</div></section>');
+  const form=shouldShowSeatForm()?seatFormHtml(state.seatEditMode?'重新提交座位审核':'提交座位审核',state.seatEditMode?'更新座位申请':'提交座位审核'):'';
+  html('<section class="panel"><div class="head"><h3>座位审核</h3></div><div class="body"><div class="status full"><b>身份审核已通过</b><p class="muted">但你的座位还没有通过审核，所以暂时不显示座位示意图、附近同担和人数。</p></div>'+seatRequestNotice()+profileEditBox()+form+'</div></section>');
   bindProfileAndSeat();
 }
 function renderUser(){
   if(!state.user.seat)return renderSeatGate();
-  html('<div class="grid"><section class="panel"><div class="head"><h3>附近座位窗口</h3><span class="muted">前后 5 排、左右 10 号</span></div><div class="body" id="nearBox">正在加载...</div></section><section class="panel"><div class="head"><h3>我的互助信息</h3></div><div class="body"><div class="status"><b>'+esc(state.user.weiboName)+'</b><p>我的座位：'+seatText(state.user.seat)+'</p><label class="field">我的附近留言<textarea id="note">'+esc(state.user.fanNote)+'</textarea></label><button id="saveNote" class="btn secondary">保存留言</button></div>'+seatRequestNotice()+profileEditBox()+seatFormHtml('申请修改座位','提交座位审核')+'</div></section></div>');
+  const form=shouldShowSeatForm()?seatFormHtml(state.seatEditMode?'重新提交座位变更':'申请修改座位',state.seatEditMode?'更新座位申请':'提交座位审核'):'';
+  html('<div class="grid"><section class="panel"><div class="head"><h3>附近座位窗口</h3><span class="muted">前后 5 排、左右 10 号</span></div><div class="body" id="nearBox">正在加载...</div></section><section class="panel"><div class="head"><h3>我的互助信息</h3></div><div class="body"><div class="status"><b>'+esc(state.user.weiboName)+'</b><p>我的座位：'+seatText(state.user.seat)+'</p><label class="field">我的附近留言<textarea id="note">'+esc(state.user.fanNote)+'</textarea></label><button id="saveNote" class="btn secondary">保存留言</button></div>'+seatRequestNotice()+profileEditBox()+form+'</div></section></div>');
   bindProfileAndSeat();
   document.getElementById('saveNote').onclick=saveNote;
   loadNearby();
@@ -159,13 +172,28 @@ function seatText(s){return s.zone+'-'+rowLabel(s.row)+'行-'+s.no+'号'}
 function statusLabel(s){return {approved:'已审核',pending:'待审核',rejected:'已打回',needs_proof:'待提交自证',deactivated:'已注销'}[s]||s}
 async function saveSeat(){
   try{
+    if(!confirm('请确认座位信息和截图无误。提交后会进入审核，审核前不能继续反复提交，确定提交吗？'))return;
+    const rowRaw=String(document.getElementById('seatRow').value||'').trim();
+    const noRaw=String(document.getElementById('seatNo').value||'').trim();
+    if(!rowRaw||!noRaw)throw new Error('请填写行和号');
     const shot=document.getElementById('seatShot').files[0];
     if(!shot) throw new Error('请上传座位号码截图');
     const screenshotUrl=await uploadImage(shot,'seat');
     const noteEl=document.getElementById('note');
-    const user=await rpc('zd_request_seat',{p_token:state.token,p_zone:document.getElementById('seatZone').value,p_row:rowInputToNumber(document.getElementById('seatRow').value),p_no:+document.getElementById('seatNo').value,p_screenshot_url:screenshotUrl,p_message:noteEl?noteEl.value:state.user.fanNote});
+    const user=await rpc('zd_request_seat',{p_token:state.token,p_zone:document.getElementById('seatZone').value,p_row:rowInputToNumber(rowRaw),p_no:+noRaw,p_screenshot_url:screenshotUrl,p_message:noteEl?noteEl.value:state.user.fanNote});
     state.user=user;
+    state.seatEditMode=false;
     alert('座位申请已提交，等待管理员审核');
+    render();
+  }catch(e){alert(e.message)}
+}
+async function withdrawSeatRequest(){
+  if(!confirm('确定撤回这次座位变更吗？撤回后管理员后台对应的座位审核会消失。'))return;
+  try{
+    const user=await rpc('zd_withdraw_seat_request',{p_token:state.token});
+    state.user=user;
+    state.seatEditMode=false;
+    alert('已撤回座位变更');
     render();
   }catch(e){alert(e.message)}
 }
@@ -209,7 +237,7 @@ function renderAdminUsers(){
   const list=state.users.filter(u=>state.adminTab==='users'||['pending','rejected'].includes(u.status));
   document.getElementById('adminBody').innerHTML=list.length?list.map(u=>{
     const approveBtn=state.adminTab==='users'?'':'<button class="btn" data-act="approve" data-id="'+esc(u.id)+'">通过</button>';
-    const req=u.seatRequest?'<p class="muted">座位审核：'+seatRequestLabel(u.seatRequest.status)+' · '+esc(u.seatRequest.seatText||'')+'</p>':'';
+    const req=u.seatRequest?'<p class="muted">座位审核：'+seatRequestLabel(u.seatRequest.status)+' · '+esc(seatDisplayText(u.seatRequest))+'</p>':'';
     return '<div class="row '+(u.status==='rejected'?'danger':'')+'"><div><b>'+esc(u.account)+' · '+esc(u.weiboName||'未填微博名')+'</b><span class="state-chip '+esc(u.status)+'">'+statusLabel(u.status)+'</span><small class="muted"> '+(u.seat?seatText(u.seat):'未登记')+'</small><p>微信名：'+esc(u.wechatName)+' · 线下群：'+esc(u.offlineGroup)+'</p>'+req+proofHtml(u.id)+'</div><div class="mini">'+approveBtn+'<button class="btn danger" data-act="reject" data-id="'+esc(u.id)+'">打回</button><button class="btn secondary" data-act="profile" data-id="'+esc(u.id)+'">改资料</button><button class="btn secondary" data-act="seat" data-id="'+esc(u.id)+'">后台改座位</button><button class="btn danger" data-act="deactivate" data-id="'+esc(u.id)+'">注销</button></div></div>';
   }).join(''):'<div class="status">暂无数据</div>';
   bindProofImages();
@@ -225,7 +253,7 @@ function renderAdminUsers(){
 async function renderSeatAudit(){
   const list=await rpc('zd_admin_seat_requests',{p_token:state.token});
   document.getElementById('adminBody').innerHTML=list.length?list.map(r=>{
-    const current=r.currentSeat?'当前座位：'+esc(seatText(r.currentSeat)):'当前无已审核座位';
+    const current=r.currentSeat?'当前座位：'+esc(seatDisplayText(r.currentSeat)):'当前无已审核座位';
     const rejected=r.status==='rejected';
     const actions=r.status==='pending'?'<button class="btn" data-seat-act="approve" data-id="'+esc(r.id)+'">通过座位</button><button class="btn danger" data-seat-act="reject" data-id="'+esc(r.id)+'">打回座位</button>':'<small class="muted">已打回，等待用户重新提交</small>';
     return '<div class="row '+(rejected?'danger':'')+'"><div><b>'+esc(r.account)+' · '+esc(r.weiboName||'未填微博名')+'</b><span class="state-chip '+esc(r.status)+'">'+seatRequestLabel(r.status)+'</span><p>'+esc(r.seatText)+' · 用户身份：'+statusLabel(r.userStatus)+'</p><p class="muted">'+current+'</p>'+(r.rejectReason?'<p>打回原因：'+esc(r.rejectReason)+'</p>':'')+'<div class="proofs"><div class="proof"><img src="'+esc(r.screenshotUrl)+'" data-proof-img="'+esc(r.screenshotUrl)+'"><span>座位号码截图</span></div></div></div><div class="mini">'+actions+'</div></div>';
